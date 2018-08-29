@@ -2,60 +2,45 @@ package twitchapi
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
-	"io/ioutil"
-	"log"
+	"fmt"
 	"net/http"
+	"net/url"
 	"path"
 
-	"github.com/kr/pretty"
+	"github.com/konkers/twitchapi/protocol"
 )
 
 type Connection struct {
 	clientID string
 	oauth    string
-	urlBase  string
-}
 
-type Channel struct {
-	Mature                       bool   `json:"mature"`
-	Status                       string `json:"status"`
-	BroadcasterLanguage          string `json:"broadcaster_language"`
-	DisplayName                  string `json:"display_name"`
-	Game                         string `json:"game"`
-	Language                     string `json:"language"`
-	ID                           int    `json:"_id"`
-	Name                         string `json:"name"`
-	CreatedAt                    string `json:"created_at"`
-	UpdatedAt                    string `json:"updated_at"`
-	Partner                      bool   `json:"partner"`
-	Logo                         string `json:"logo"`
-	VideoBanner                  string `json:"video_banner"`
-	ProfileBanner                string `json:"profile_banner"`
-	ProfileBannerBackgroundColor string `json:"profile_banner_background_color"`
-	URL                          string `json:"url"`
-	Views                        int    `json:"views"`
-	Followers                    int    `json:"followers"`
-	BroadcasterType              string `json:"broadcaster_type"`
-	StreamKey                    string `json:"stream_key"`
-	Email                        string `json:"email"`
-}
-
-type ChannelUpdate struct {
-	Status             *string `json:"status,omitempty"`
-	Game               *string `json:"game,omitempty"`
-	Delay              *string `json:"string,omitempty"`
-	ChannelFeedEnabled *bool   `json:"channel_feed_enabled,omitempty"`
-}
-
-type Update struct {
-	Channel *ChannelUpdate `json:"channel,omitempty"`
+	// UrlBase of the twitch API endpoint.  Defaults to
+	// https://api.twitch.tv/kraken
+	UrlBase string
 }
 
 func NewConnection(clientID string, oauth string) *Connection {
 	return &Connection{
+		UrlBase:  "https://api.twitch.tv/kraken",
 		clientID: clientID,
 		oauth:    oauth,
+	}
+}
+
+func (c *Connection) getClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport)
+	url, _ := url.Parse(c.UrlBase)
+
+	// localhost is used for testing with a self signed certificate.
+	if url.Hostname() == "localhost" {
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+	return &http.Client{
+		Transport: transport,
 	}
 }
 
@@ -65,11 +50,8 @@ func (c *Connection) put(urlPath string, data interface{}) error {
 		return err
 	}
 
-	req, err := http.NewRequest("PUT", "https://api.twitch.tv/kraken/"+urlPath,
+	req, err := http.NewRequest("PUT", c.UrlBase+"/"+urlPath,
 		bytes.NewBuffer(b))
-	log.Printf("%#v\n", pretty.Formatter(req))
-	log.Printf("%#v\n", req.URL.String())
-	log.Printf("%#v\n", string(b))
 	if err != nil {
 		return err
 	}
@@ -77,42 +59,38 @@ func (c *Connection) put(urlPath string, data interface{}) error {
 	req.Header.Add("Authorization", "OAuth "+c.oauth)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := c.getClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("non OK status code %d", resp.StatusCode)
 	}
-	log.Println(string(body))
-	return err
+
+	return nil
 }
 
 func (c *Connection) get(urlPath string, data interface{}) error {
-	req, err := http.NewRequest("GET", "https://api.twitch.tv/kraken/"+urlPath, nil)
+	req, err := http.NewRequest("GET", c.UrlBase+"/"+urlPath, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Add("Client-ID", c.clientID)
 	req.Header.Add("Authorization", "OAuth "+c.oauth)
 
-	client := &http.Client{}
+	client := c.getClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return json.Unmarshal(body, data)
+	return json.NewDecoder(resp.Body).Decode(data)
 }
 
-func (c *Connection) GetChannel() (*Channel, error) {
-	var channel Channel
+func (c *Connection) GetChannel() (*protocol.Channel, error) {
+	var channel protocol.Channel
 	err := c.get("channel", &channel)
 	if err != nil {
 		return nil, err
@@ -120,11 +98,11 @@ func (c *Connection) GetChannel() (*Channel, error) {
 	return &channel, nil
 }
 
-func (c *Connection) SetChannelGame(id int, game string) error {
-	params := &Update{
-		Channel: &ChannelUpdate{
+func (c *Connection) SetChannelGame(channel string, game string) error {
+	params := &protocol.Update{
+		Channel: &protocol.ChannelUpdate{
 			Game: &game,
 		},
 	}
-	return c.put(path.Join("channels", "djkonkers"), params)
+	return c.put(path.Join("channels", channel), params)
 }
