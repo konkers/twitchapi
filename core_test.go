@@ -35,7 +35,6 @@ func TestHttpBadUrlBase(t *testing.T) {
 	}
 }
 func TestHttpErrorFromServer(t *testing.T) {
-
 	mock, err := mocktwitch.NewTwitch()
 	if err != nil {
 		t.Fatalf("Can't create mock twitch: %v.", err)
@@ -45,6 +44,7 @@ func TestHttpErrorFromServer(t *testing.T) {
 	mock.ForceErrors = true
 	api := NewConnection("", "")
 	api.UrlBase = mock.ApiUrlBase
+	api.VerboseLogging = true
 
 	_, err = api.GetChannel()
 	if err == nil {
@@ -56,6 +56,7 @@ func TestHttpErrorFromServer(t *testing.T) {
 		t.Errorf("No error returned with ForceErrors.")
 	}
 }
+
 func TestHttpBadJSON(t *testing.T) {
 	mock, err := mocktwitch.NewTwitch()
 	if err != nil {

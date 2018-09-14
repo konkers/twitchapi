@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -16,6 +18,8 @@ type Connection struct {
 	clientID string
 	oauth    string
 
+	VerboseLogging bool
+
 	// UrlBase of the twitch API endpoint.  Defaults to
 	// https://api.twitch.tv/kraken
 	UrlBase string
@@ -23,9 +27,10 @@ type Connection struct {
 
 func NewConnection(clientID string, oauth string) *Connection {
 	return &Connection{
-		UrlBase:  "https://api.twitch.tv/kraken",
-		clientID: clientID,
-		oauth:    oauth,
+		UrlBase:        "https://api.twitch.tv/kraken",
+		VerboseLogging: false,
+		clientID:       clientID,
+		oauth:          oauth,
 	}
 }
 
@@ -81,12 +86,27 @@ func (c *Connection) get(urlPath string, data interface{}) error {
 	req.Header.Add("Client-ID", c.clientID)
 	req.Header.Add("Authorization", "OAuth "+c.oauth)
 
+	if c.VerboseLogging {
+		log.Printf("twitch v5 req: req.URL.String()")
+	}
 	client := c.getClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
-	return json.NewDecoder(resp.Body).Decode(data)
+	if c.VerboseLogging {
+		respData, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		var pretty bytes.Buffer
+		json.Indent(&pretty, respData, "", "\t")
+
+		log.Printf("twitch v5 resp: %s", pretty.String())
+		return json.Unmarshal(respData, data)
+	} else {
+		return json.NewDecoder(resp.Body).Decode(data)
+	}
 }
 
 func (c *Connection) GetChannel() (*protocol.Channel, error) {
