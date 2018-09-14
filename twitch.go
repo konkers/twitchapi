@@ -126,3 +126,12 @@ func (c *Connection) SetChannelGame(channel string, game string) error {
 	}
 	return c.put(path.Join("channels", channel), params)
 }
+
+func (c *Connection) GetChannelFollows(channelID string) (*protocol.ChannelFollows, error) {
+	var follows protocol.ChannelFollows
+	err := c.get(path.Join("channels", channelID, "follows"), &follows)
+	if err != nil {
+		return nil, err
+	}
+	return &follows, nil
+}
