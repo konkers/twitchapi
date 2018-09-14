@@ -24,6 +24,29 @@ type Channel struct {
 	Email                        string `json:"email"`
 }
 
+type User struct {
+	ID          int    `json:"_id"`
+	Bio         string `json:"bio"`
+	CreatedAt   string `json:"created_at"`
+	DisplayName string `json:"display_name"`
+	Logo        string `json:"logo"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	UpdateAt    string `json:"updated_at"`
+}
+
+type ChannelFollower struct {
+	CreatedAt     string `json:"created_at"`
+	Notifications bool   `json:"notifications"`
+	User          User   `json:"user"`
+}
+
+type ChannelFollows struct {
+	Cursor  string             `json:"_cursor"`
+	Total   int                `json:"_total"`
+	Follows []*ChannelFollower `json:"follows"`
+}
+
 type ChannelUpdate struct {
 	Status             *string `json:"status,omitempty"`
 	Game               *string `json:"game,omitempty"`
