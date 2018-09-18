@@ -1,6 +1,7 @@
 package twitchapi
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -71,5 +72,21 @@ func TestHttpBadJSON(t *testing.T) {
 	err = api.put("channels", math.Inf(1))
 	if err == nil {
 		t.Errorf("No error returned when tring to put math.Inf(1).")
+	}
+}
+
+type errReader struct{}
+
+func (errReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("test error")
+}
+
+func TestBodyReadError(t *testing.T) {
+	c := &Connection{
+		VerboseLogging: true,
+	}
+	err := c.decodeResponse(errReader{}, nil)
+	if err == nil {
+		t.Errorf("Read error not propagated in decodeResponse().")
 	}
 }

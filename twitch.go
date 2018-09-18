@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -78,6 +79,22 @@ func (c *Connection) put(urlPath string, data interface{}) error {
 	return nil
 }
 
+func (c *Connection) decodeResponse(body io.Reader, data interface{}) error {
+	if c.VerboseLogging {
+		respData, err := ioutil.ReadAll(body)
+		if err != nil {
+			return err
+		}
+		var pretty bytes.Buffer
+		json.Indent(&pretty, respData, "", "\t")
+
+		log.Printf("twitch v5 resp: %s", pretty.String())
+		return json.Unmarshal(respData, data)
+	} else {
+		return json.NewDecoder(body).Decode(data)
+	}
+}
+
 func (c *Connection) get(urlPath string, data interface{}) error {
 	req, err := http.NewRequest("GET", c.UrlBase+"/"+urlPath, nil)
 	if err != nil {
@@ -94,19 +111,7 @@ func (c *Connection) get(urlPath string, data interface{}) error {
 	if err != nil {
 		return err
 	}
-	if c.VerboseLogging {
-		respData, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		var pretty bytes.Buffer
-		json.Indent(&pretty, respData, "", "\t")
-
-		log.Printf("twitch v5 resp: %s", pretty.String())
-		return json.Unmarshal(respData, data)
-	} else {
-		return json.NewDecoder(resp.Body).Decode(data)
-	}
+	return c.decodeResponse(resp.Body, data)
 }
 
 func (c *Connection) GetChannel() (*protocol.Channel, error) {
